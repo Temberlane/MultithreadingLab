@@ -3,6 +3,8 @@ package main
 import (
     "fmt"
     "sync"
+    "io"
+    "net/http"
 )
 
 // WaitGroup is used to wait for all workers to finish.
@@ -19,11 +21,23 @@ type FetchResult struct {
 // Worker function
 func worker(id int, jobs <-chan string, results chan<- FetchResult) {
     defer wg.Done()
-    // TODO: fetch the URL
-    // TODO: send Result struct to results channel
-    // hint: use resp, err := http.Get(url)
-}
+    for url := range jobs {
+        resp, err := http.Get(url)
+        if err != nil {
+            results <- FetchResult{URL: url, Error: err}
+            continue
+        }
+        defer resp.Body.Close()
 
+        body, _ := io.ReadAll(resp.Body)
+        results <- FetchResult{
+            URL:        url,
+            StatusCode: resp.StatusCode,
+            Size:       len(body),
+            Error:      nil,
+        }
+    }
+}
 func main() {
     urls := []string{
         "https://example.com",
@@ -33,7 +47,7 @@ func main() {
         "https://httpbin.org/get",
     }
 
-    numWorkers := 3
+    numWorkers := 1
 
     jobs := make(chan string, len(urls))
     results := make(chan FetchResult, len(urls))
