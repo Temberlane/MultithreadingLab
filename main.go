@@ -2,7 +2,11 @@ package main
 
 import (
     "fmt"
+    "sync"
 )
+
+// WaitGroup is used to wait for all workers to finish.
+var wg sync.WaitGroup
 
 // Structure to store results
 type FetchResult struct {
@@ -34,12 +38,30 @@ func main() {
     jobs := make(chan string, len(urls))
     results := make(chan FetchResult, len(urls))
 
-    // TODO: Start workers
+    // Start workers
+    wg.Add(numWorkers)
+    for id := 1; id <= numWorkers; id++ {
+        go worker(id, jobs, results)
+    }
 
-    // TODO: Send jobs
+    // Send jobs
+    for _, url := range urls {
+        jobs <- url
+    }
+    close(jobs)
 
-    // TODO: Collect results
+    // Collect results
+    for i := 0; i < len(urls); i++ {
+        res := <-results
+        if res.Error != nil {
+            fmt.Printf("URL: %s | error: %v\n", res.URL, res.Error)
+        } else {
+            fmt.Printf("URL: %s | status: %d | size: %d bytes\n",
+                res.URL, res.StatusCode, res.Size)
+        }
+    }
 
+    wg.Wait()
     fmt.Println("\nScraping complete!")
 }
 
